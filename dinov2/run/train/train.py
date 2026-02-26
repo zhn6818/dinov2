@@ -3,9 +3,15 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
-import logging
 import os
 import sys
+
+# 将项目根目录加入 sys.path，无需安装 dinov2
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+import logging
 
 from dinov2.logging import setup_logging
 from dinov2.train import get_args_parser as get_train_args_parser
