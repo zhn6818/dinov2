@@ -43,9 +43,10 @@ class SSLMetaArch(nn.Module):
         logger.info(f"OPTIONS -- architecture : embed_dim: {embed_dim}")
 
         if cfg.student.pretrained_weights:
-            chkpt = torch.load(cfg.student.pretrained_weights)
+            from dinov2.utils.utils import load_pretrained_weights
             logger.info(f"OPTIONS -- pretrained weights: loading from {cfg.student.pretrained_weights}")
-            student_backbone.load_state_dict(chkpt["model"], strict=False)
+            # 支持两种格式: 1) backbone-only 官方权重(直接 state_dict) 2) 训练 checkpoint (chkpt["model"])
+            load_pretrained_weights(student_backbone, cfg.student.pretrained_weights, checkpoint_key="model")
 
         self.embed_dim = embed_dim
         self.dino_out_dim = cfg.dino.head_n_prototypes
@@ -348,9 +349,11 @@ class SSLMetaArch(nn.Module):
     def fsdp_synchronize_streams(self):
         if self.need_to_synchronize_fsdp_streams:
             torch.cuda.synchronize()
-            self.student.dino_head._streams = (
-                self.teacher.dino_head._streams
-            ) = self.student.backbone._streams = self.teacher.backbone._streams
+            # _streams 仅在多 GPU FSDP 分片时存在，单 GPU 或 NO_SHARD 时可能不存在
+            if hasattr(self.student.backbone, "_streams"):
+                shared_streams = self.student.backbone._streams
+                self.student.dino_head._streams = self.teacher.dino_head._streams = shared_streams
+                self.teacher.backbone._streams = shared_streams
             self.need_to_synchronize_fsdp_streams = False
 
     def update_teacher(self, m):

@@ -91,7 +91,18 @@ class MemEffAttention(Attention):
 
         q, k, v = unbind(qkv, 2)
 
-        x = memory_efficient_attention(q, k, v, attn_bias=attn_bias)
+        try:
+            x = memory_efficient_attention(q, k, v, attn_bias=attn_bias)
+        except (NotImplementedError, RuntimeError) as e:
+            # xFormers 在 sm75 等旧 GPU 上无可用算子，回退到 PyTorch 标准 attention
+            if attn_bias is not None:
+                raise AssertionError(
+                    "xFormers memory_efficient_attention 不可用，且 nested tensors 需要 xFormers。"
+                    "请使用 sm80+ GPU (A100/H100) 或正确安装带 CUDA 的 xFormers。"
+                ) from e
+            logger.warning("xFormers memory_efficient_attention 不可用，回退到 PyTorch 标准 attention: %s", e)
+            return super().forward(x)
+
         x = x.reshape([B, N, C])
 
         x = self.proj(x)

@@ -265,52 +265,65 @@ def drop_add_residual_stochastic_depth_list(
 
 
 class NestedTensorBlock(Block):
+    def _forward_nested_fallback(self, x_list: List[Tensor], attn_residual_func, ffn_residual_func) -> List[Tensor]:
+        """xFormers 不可用时，逐 tensor 处理（等价于 block-diagonal attention）"""
+        for i in range(len(x_list)):
+            x_list[i] = x_list[i] + attn_residual_func(x_list[i], attn_bias=None)
+            x_list[i] = x_list[i] + ffn_residual_func(x_list[i])
+        return x_list
+
     def forward_nested(self, x_list: List[Tensor]) -> List[Tensor]:
         """
         x_list contains a list of tensors to nest together and run
         """
         assert isinstance(self.attn, MemEffAttention)
 
-        if self.training and self.sample_drop_ratio > 0.0:
+        def attn_residual_func(x: Tensor, attn_bias=None) -> Tensor:
+            return self.ls1(self.attn(self.norm1(x), attn_bias=attn_bias))
 
-            def attn_residual_func(x: Tensor, attn_bias=None) -> Tensor:
+        def ffn_residual_func(x: Tensor, attn_bias=None) -> Tensor:
+            return self.ls2(self.mlp(self.norm2(x)))
+
+        if not XFORMERS_AVAILABLE:
+            return self._forward_nested_fallback(x_list, attn_residual_func, ffn_residual_func)
+
+        if self.training and self.sample_drop_ratio > 0.0:
+            def attn_res_func_drop(x: Tensor, attn_bias=None) -> Tensor:
                 return self.attn(self.norm1(x), attn_bias=attn_bias)
 
-            def ffn_residual_func(x: Tensor, attn_bias=None) -> Tensor:
+            def ffn_res_func_drop(x: Tensor, attn_bias=None) -> Tensor:
                 return self.mlp(self.norm2(x))
 
-            x_list = drop_add_residual_stochastic_depth_list(
-                x_list,
-                residual_func=attn_residual_func,
-                sample_drop_ratio=self.sample_drop_ratio,
-                scaling_vector=self.ls1.gamma if isinstance(self.ls1, LayerScale) else None,
-            )
-            x_list = drop_add_residual_stochastic_depth_list(
-                x_list,
-                residual_func=ffn_residual_func,
-                sample_drop_ratio=self.sample_drop_ratio,
-                scaling_vector=self.ls2.gamma if isinstance(self.ls1, LayerScale) else None,
-            )
-            return x_list
+            try:
+                x_list = drop_add_residual_stochastic_depth_list(
+                    x_list,
+                    residual_func=attn_res_func_drop,
+                    sample_drop_ratio=self.sample_drop_ratio,
+                    scaling_vector=self.ls1.gamma if isinstance(self.ls1, LayerScale) else None,
+                )
+                x_list = drop_add_residual_stochastic_depth_list(
+                    x_list,
+                    residual_func=ffn_res_func_drop,
+                    sample_drop_ratio=self.sample_drop_ratio,
+                    scaling_vector=self.ls2.gamma if isinstance(self.ls1, LayerScale) else None,
+                )
+                return x_list
+            except (NotImplementedError, RuntimeError, AssertionError):
+                return self._forward_nested_fallback(x_list, attn_residual_func, ffn_residual_func)
         else:
-
-            def attn_residual_func(x: Tensor, attn_bias=None) -> Tensor:
-                return self.ls1(self.attn(self.norm1(x), attn_bias=attn_bias))
-
-            def ffn_residual_func(x: Tensor, attn_bias=None) -> Tensor:
-                return self.ls2(self.mlp(self.norm2(x)))
-
-            attn_bias, x = get_attn_bias_and_cat(x_list)
-            x = x + attn_residual_func(x, attn_bias=attn_bias)
-            x = x + ffn_residual_func(x)
-            return attn_bias.split(x)
+            try:
+                attn_bias, x = get_attn_bias_and_cat(x_list)
+                x = x + attn_residual_func(x, attn_bias=attn_bias)
+                x = x + ffn_residual_func(x)
+                return attn_bias.split(x)
+            except (NotImplementedError, RuntimeError, AssertionError):
+                # xFormers 算子不可用时（如 sm75 GPU），逐 tensor 处理，等价于 block-diagonal attention
+                return self._forward_nested_fallback(x_list, attn_residual_func, ffn_residual_func)
 
     def forward(self, x_or_x_list):
         if isinstance(x_or_x_list, Tensor):
             return super().forward(x_or_x_list)
         elif isinstance(x_or_x_list, list):
-            if not XFORMERS_AVAILABLE:
-                raise AssertionError("xFormers is required for using nested tensors")
             return self.forward_nested(x_or_x_list)
         else:
             raise AssertionError

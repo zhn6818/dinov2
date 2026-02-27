@@ -5,7 +5,7 @@
 # ==================== 配置区域 ====================
 
 # 修改这里：设置你的图像数据路径
-DATA_PATH="/Volumes/data1/JH/projects/JLD_imgprocess/datasetv2/img"
+DATA_PATH="/data1/zhn/JLD/dataset/img/"
 
 # 修改这里：设置输出目录
 OUTPUT_DIR="./output/vitb14_finetune"
@@ -13,7 +13,7 @@ OUTPUT_DIR="./output/vitb14_finetune"
 # 预训练权重（可选，默认使用官方 URL）
 # PRETRAINED_WEIGHTS="https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_pretrain.pth"
 # 或者使用本地路径：
-# PRETRAINED_WEIGHTS="/path/to/pretrained_weights/dinov2_vitb14_pretrain.pth"
+PRETRAINED_WEIGHTS="pretrain/dinov2_vitb14_pretrain.pth"
 
 # ==================== 训练配置 ====================
 
@@ -55,10 +55,15 @@ fi
 echo "开始训练..."
 echo ""
 
-# 根据GPU数量选择训练方式
+# 禁用 xFormers：在 RTX 20 系列等 sm75 GPU 上，xFormers 的 memory_efficient_attention 无可用算子
+# 设置后会自动回退到 PyTorch 标准 attention（稍慢但兼容所有 GPU）
+export XFORMERS_DISABLED=1
+
+# 使用 train_local.py 进行单机直接训练（绕过 submitit，前台运行）
+# 原 train.py 使用 submitit 提交任务，会立即返回且任务在后台失败
 if [ "$NUM_GPUS" -eq 1 ]; then
     # 单 GPU 训练
-    python dinov2/run/train/train.py \
+    python dinov2/run/train/train_local.py \
         --config-file "$CONFIG_FILE" \
         --output-dir "$OUTPUT_DIR" \
         train.dataset_path=FlatFolder:root="$DATA_PATH" \
@@ -66,7 +71,7 @@ if [ "$NUM_GPUS" -eq 1 ]; then
 
 elif [ "$NUM_GPUS" -ge 2 ]; then
     # 多 GPU 训练（使用 torchrun）
-    torchrun --nproc_per_node=$NUM_GPUS dinov2/run/train/train.py \
+    torchrun --nproc_per_node=$NUM_GPUS dinov2/run/train/train_local.py \
         --config-file "$CONFIG_FILE" \
         --output-dir "$OUTPUT_DIR" \
         train.dataset_path=FlatFolder:root="$DATA_PATH" \
