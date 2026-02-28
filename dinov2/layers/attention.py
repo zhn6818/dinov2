@@ -91,7 +91,37 @@ class MemEffAttention(Attention):
 
         q, k, v = unbind(qkv, 2)
 
-        x = memory_efficient_attention(q, k, v, attn_bias=attn_bias)
+        try:
+            x = memory_efficient_attention(q, k, v, attn_bias=attn_bias)
+        except NotImplementedError:
+            # 低算力 GPU (如 RTX 2060 sm75) 不支持 xFormers，回退到 PyTorch 标准 attention
+            q, k, v = [t.transpose(1, 2) for t in [q, k, v]]  # (B,N,H,D) -> (B,H,N,D)
+            attn_mask = None
+            if attn_bias is not None:
+                # BlockDiagonalMask: materialize 为 (1,1,N,N)，0=attend，-inf=mask
+                try:
+                    from xformers.ops.fmha.attn_bias import BlockDiagonalMask
+                    if isinstance(attn_bias, BlockDiagonalMask):
+                        N = q.shape[2]
+                        attn_mask = attn_bias.materialize(
+                            shape=(1, 1, N, N),
+                            dtype=q.dtype,
+                            device=q.device,
+                        )
+                    else:
+                        raise
+                except Exception:
+                    raise NotImplementedError(
+                        "xFormers 算子不支持当前 GPU，且 attn_bias 类型无法回退"
+                    ) from None
+            x = nn.functional.scaled_dot_product_attention(
+                q, k, v,
+                attn_mask=attn_mask,
+                dropout_p=self.attn_drop if self.training else 0.0,
+                is_causal=False,
+            )
+            x = x.transpose(1, 2)  # (B,H,N,D) -> (B,N,H,D)
+
         x = x.reshape([B, N, C])
 
         x = self.proj(x)
