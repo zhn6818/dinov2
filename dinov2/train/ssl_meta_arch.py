@@ -4,6 +4,7 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 from functools import partial
+import math
 import logging
 
 import torch
@@ -28,6 +29,26 @@ except ImportError:
 logger = logging.getLogger("dinov2")
 
 
+def _interpolate_pos_embed_for_checkpoint(ckpt_pos_embed, target_shape, patch_size=14):
+    """
+    将 checkpoint 中的 pos_embed 插值到目标尺寸，用于加载不同 crop size 的预训练权重。
+    ckpt_pos_embed: [1, N+1, C] 其中 N 为 patch 数
+    target_shape: (H, W) 目标 patch 网格尺寸，如 (16, 16) 对应 224x224 输入
+    """
+    cls_pos = ckpt_pos_embed[:, :1]
+    patch_pos = ckpt_pos_embed[:, 1:]
+    N = patch_pos.shape[1]
+    M = int(math.sqrt(N))
+    assert N == M * M
+    dim = patch_pos.shape[-1]
+    patch_pos = patch_pos.reshape(1, M, M, dim).permute(0, 3, 1, 2)
+    patch_pos = nn.functional.interpolate(
+        patch_pos, size=target_shape, mode="bicubic", antialias=False
+    )
+    patch_pos = patch_pos.permute(0, 2, 3, 1).view(1, -1, dim)
+    return torch.cat((cls_pos, patch_pos), dim=1)
+
+
 class SSLMetaArch(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -43,8 +64,22 @@ class SSLMetaArch(nn.Module):
         logger.info(f"OPTIONS -- architecture : embed_dim: {embed_dim}")
 
         if cfg.student.pretrained_weights:
-            chkpt = torch.load(cfg.student.pretrained_weights)
+            chkpt = torch.load(cfg.student.pretrained_weights, map_location="cpu")
             logger.info(f"OPTIONS -- pretrained weights: loading from {cfg.student.pretrained_weights}")
+            # 处理 pos_embed 尺寸不匹配：预训练为 518(37x37)，小 crop 时需插值
+            if "pos_embed" in chkpt:
+                ckpt_pos = chkpt["pos_embed"]
+                model_pos = student_backbone.pos_embed
+                patch_size = getattr(student_backbone, "patch_size", 14)
+                if ckpt_pos.shape != model_pos.shape:
+                    h0 = model_pos.shape[1] - 1
+                    w0 = int(math.sqrt(h0))
+                    assert h0 == w0 * w0, f"pos_embed patch count {h0} not square"
+                    target_hw = (w0, w0)
+                    chkpt["pos_embed"] = _interpolate_pos_embed_for_checkpoint(
+                        ckpt_pos, target_hw, patch_size
+                    )
+                    logger.info(f"OPTIONS -- pos_embed interpolated: {ckpt_pos.shape} -> {chkpt['pos_embed'].shape}")
             student_backbone.load_state_dict(chkpt, strict=False)
 
         self.embed_dim = embed_dim
