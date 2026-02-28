@@ -5,15 +5,15 @@
 # ==================== 配置区域 ====================
 
 # 修改这里：设置你的图像数据路径
-DATA_PATH="/Volumes/data1/JH/projects/JLD_imgprocess/datasetv2/img"
+DATA_PATH="/data1/zhn/JLD/dataset/img"
 
 # 修改这里：设置输出目录
-OUTPUT_DIR="./output/vitb14_finetune"
+OUTPUT_DIR="./output/vitb14_finetune2"
 
 # 预训练权重（可选，默认使用官方 URL）
 # PRETRAINED_WEIGHTS="https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_pretrain.pth"
 # 或者使用本地路径：
-# PRETRAINED_WEIGHTS="/path/to/pretrained_weights/dinov2_vitb14_pretrain.pth"
+PRETRAINED_WEIGHTS="pretrain/dinov2_vitb14_pretrain.pth"
 
 # ==================== 训练配置 ====================
 
@@ -56,9 +56,10 @@ echo "开始训练..."
 echo ""
 
 # 根据GPU数量选择训练方式
+# 注意：使用 dinov2/train/train.py 直接训练，不要用 dinov2/run/train/train.py（submitit 会默认启动 8 进程抢单卡）
 if [ "$NUM_GPUS" -eq 1 ]; then
-    # 单 GPU 训练
-    python dinov2/run/train/train.py \
+    # 单 GPU 训练（直接运行，非 submitit）
+    python dinov2/train/train.py \
         --config-file "$CONFIG_FILE" \
         --output-dir "$OUTPUT_DIR" \
         train.dataset_path=FlatFolder:root="$DATA_PATH" \
@@ -66,7 +67,7 @@ if [ "$NUM_GPUS" -eq 1 ]; then
 
 elif [ "$NUM_GPUS" -ge 2 ]; then
     # 多 GPU 训练（使用 torchrun）
-    torchrun --nproc_per_node=$NUM_GPUS dinov2/run/train/train.py \
+    torchrun --nproc_per_node=$NUM_GPUS dinov2/train/train.py \
         --config-file "$CONFIG_FILE" \
         --output-dir "$OUTPUT_DIR" \
         train.dataset_path=FlatFolder:root="$DATA_PATH" \

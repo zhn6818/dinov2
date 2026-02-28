@@ -7,6 +7,14 @@ import argparse
 import logging
 import math
 import os
+import sys
+
+# 将项目根目录加入 sys.path，无需安装 dinov2
+# train.py 位于 dinov2/dinov2/train/，向上 3 层得到项目根 dinov2/
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 from functools import partial
 
 from fvcore.common.checkpoint import PeriodicCheckpointer

@@ -20,12 +20,12 @@ ibot:
   head_hidden_dim: 2048
 
 train:
-  batch_size_per_gpu: 32          # 降低到 32，适应 1-2 GPU
+  batch_size_per_gpu: 2          # 518 图像较大，降低 batch 避免 OOM（原 224 可用 8）
   dataset_path: FlatFolder:root=/path/to/your/images
   output_dir: ./output/vitb14_finetune
   saveckp_freq: 5000              # 更频繁保存检查点
   seed: 0
-  num_workers: 8
+  num_workers: 0                 # 8GB 显存需设为 0，避免 fork 的 worker 继承 CUDA 占用 ~2GB
   OFFICIAL_EPOCH_LENGTH: 250      # 1-3万图像，调整 epoch 长度
   cache_dataset: false            # 小数据集不需要缓存
   centering: "centering"
@@ -78,8 +78,8 @@ crops:
   global_crops_scale: [0.4, 1.0]  # 调整裁剪范围，更适合小数据集
   local_crops_number: 6           # 减少局部裁剪数量加快训练
   local_crops_scale: [0.05, 0.4]
-  global_crops_size: 224
-  local_crops_size: 96
+  global_crops_size: 518          # 必须与官方预训练权重一致(518)，否则 pos_embed 尺寸不匹配
+  local_crops_size: 98            # 必须为 patch_size(14) 的倍数，98=14*7
 
 evaluation:
   eval_period_iterations: 5000    # 更频繁评估
