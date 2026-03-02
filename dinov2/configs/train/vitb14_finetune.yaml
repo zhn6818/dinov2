@@ -8,7 +8,6 @@ dino:
   head_nlayers: 3
   head_hidden_dim: 2048
   loss_weight: 1.0
-  koleo_loss_weight: 0.1
 
 ibot:
   loss_weight: 1.0
@@ -35,7 +34,7 @@ train:
 student:
   arch: vit_base                  # ViT-B 模型
   patch_size: 14
-  drop_path_rate: 0.2             # 降低 dropout，防止小数据集过拟合
+  drop_path_rate: 0.3             # 降低 dropout，防止小数据集过拟合
   layerscale: 1.0e-05
   drop_path_uniform: true
   pretrained_weights: https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_pretrain.pth
@@ -51,21 +50,21 @@ student:
   channel_adaptive: false
 
 teacher:
-  momentum_teacher: 0.996         # 降低动量，适应小数据集
+  momentum_teacher: 0.992         # 降低动量，适应小数据集
   final_momentum_teacher: 1
   warmup_teacher_temp: 0.04
   teacher_temp: 0.07
-  warmup_teacher_temp_epochs: 10  # 减少预热 epoch
+  warmup_teacher_temp_epochs: 20  # 减少预热 epoch
   in_chans: 3
   channel_adaptive: false
 
 optim:
-  epochs: 50                      # 减少总 epoch，小数据集不需要 100
+  epochs: 250                      # 减少总 epoch，小数据集不需要 100
   weight_decay: 0.04
   weight_decay_end: 0.4
-  base_lr: 0.002                  # 降低学习率，防止过拟合
+  base_lr: 0.004                  # 降低学习率，防止过拟合
   lr: 0.0                         # 会根据缩放规则自动设置
-  warmup_epochs: 5                # 减少预热
+  warmup_epochs: 10                # 减少预热
   min_lr: 1.0e-06
   clip_grad: 3.0
   freeze_last_layer_epochs: 1
@@ -79,8 +78,8 @@ crops:
   global_crops_scale: [0.4, 1.0]  # 调整裁剪范围，更适合小数据集
   local_crops_number: 4           # 显存不足可降至 2，减少局部裁剪数量
   local_crops_scale: [0.05, 0.4]
-  global_crops_size: 224          # 显存不足时减小：224/280/336/392/448，代码会自动插值 pos_embed
-  local_crops_size: 56            # 显存不足可降至 42 或 28，必须为 patch_size(14) 的倍数
+  global_crops_size: 448          # 显存不足时减小：224/280/336/392/448，代码会自动插值 pos_embed
+  local_crops_size: 98            # 显存不足可降至 42 或 28，必须为 patch_size(14) 的倍数
 
 evaluation:
   eval_period_iterations: 5000    # 更频繁评估

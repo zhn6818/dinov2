@@ -13,11 +13,22 @@ class FlatFolderDataset(ExtendedVisionDataset):
     """
     支持简单文件夹结构的数据集，无需类别子文件夹。
     适用于自监督学习场景。
+    支持单层平铺和子文件夹递归两种目录结构。
 
     目录结构示例:
+        单层平铺:
         root/
             ├── image1.jpg
             ├── image2.png
+            └── ...
+
+        子文件夹结构（如 jinxing/TT、jinxing/ZZ 等）:
+        root/
+            ├── TT/
+            │   ├── img1.jpg
+            │   └── ...
+            ├── ZZ/
+            │   └── ...
             └── ...
     """
 
@@ -38,7 +49,7 @@ class FlatFolderDataset(ExtendedVisionDataset):
             raise RuntimeError(f"在目录 {root} 中未找到任何图像文件 (支持的扩展名: {extensions})")
 
     def _load_images(self) -> list:
-        """扫描文件夹中的所有图像"""
+        """扫描文件夹中的所有图像（支持子文件夹递归扫描）"""
         samples = []
         root = os.path.expanduser(self.root)
 
@@ -48,11 +59,12 @@ class FlatFolderDataset(ExtendedVisionDataset):
         if not os.path.isdir(root):
             raise NotADirectoryError(f"路径不是目录: {root}")
 
-        for fname in sorted(os.listdir(root)):
-            if fname.lower().endswith(self.extensions):
-                samples.append(os.path.join(root, fname))
+        for dirpath, _, filenames in os.walk(root):
+            for fname in sorted(filenames):
+                if fname.lower().endswith(self.extensions):
+                    samples.append(os.path.join(dirpath, fname))
 
-        return samples
+        return sorted(samples)  # 保持全局排序一致性
 
     def get_image_data(self, index: int) -> bytes:
         """返回图像字节数据"""

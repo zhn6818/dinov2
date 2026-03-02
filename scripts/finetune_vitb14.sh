@@ -2,13 +2,15 @@
 # DINOv2 ViT-B/14 垂直领域微调脚本
 # 适用于 1-2 GPU、1-3 万无标签图像
 
+# nohup bash scripts/finetune_vitb14.sh > finetune_vitb14.out 2>&1 &
+
 # ==================== 配置区域 ====================
 
 # 修改这里：设置你的图像数据路径
-DATA_PATH="/data1/zhn/JLD/dataset/img"
+DATA_PATH="/data1/zhn/jinxiang"
 
 # 修改这里：设置输出目录
-OUTPUT_DIR="./output/vitb14_finetune2"
+OUTPUT_DIR="./output/vitb14_finetune_jinxiang"
 
 # 预训练权重（可选，默认使用官方 URL）
 # PRETRAINED_WEIGHTS="https://dl.fbaipublicfiles.com/dinov2/dinov2_vitb14/dinov2_vitb14_pretrain.pth"
