@@ -11,3 +11,6 @@ dist/
 .vscode/
 pretrain/
 output/
+*.png
+*.npy
+*.txt

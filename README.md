@@ -539,6 +539,9 @@ Training time is approximately 3.3 days and the resulting checkpoint should reac
 
 The training code saves the weights of the teacher in the `eval` folder every 12500 iterations for evaluation.
 
+### 垂直领域微调 (ViT-B/14 Finetune)
+
+使用 `dinov2/configs/train/vitb14_finetune.yaml` 和 `scripts/finetune_vitb14.sh` 可在无标签图像上微调 DINOv2。训练产出的 checkpoint 格式为 `model_XXXXX.rank_0.pth`，需先提取 teacher 权重才能用于评估和推理。**完整说明（提取 teacher、用自有数据验证微调效果）见 [docs/README_FINETUNE_EVAL.md](docs/README_FINETUNE_EVAL.md)**。
 
 ## Evaluation
 

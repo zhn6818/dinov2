@@ -1,0 +1,7 @@
+# 微调模型 eval 配置（crop_size=224 与训练一致）
+student:
+  arch: vit_base
+  patch_size: 14
+crops:
+  global_crops_size: 224  # 与 vitb14_finetune 训练配置一致
+  local_crops_size: 98
