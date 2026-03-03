@@ -9,3 +9,10 @@ dist/
 *.swp
 
 .vscode/
+pretrain/
+output/
+*.png
+*.npy
+*.txt
+*.log
+*.out
