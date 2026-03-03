@@ -656,6 +656,7 @@ A few notebooks are provided to help the community leverage the models and code:
 <ul>
   <li><a href="https://github.com/facebookresearch/dinov2/blob/main/notebooks/depth_estimation.ipynb">Depth estimation</a> - How to load and use the depth heads in combination with a matching backbone via mmcv</li>
   <li><a href="https://github.com/facebookresearch/dinov2/blob/main/notebooks/semantic_segmentation.ipynb">Semantic segmentation</a> - How to load and use the segmentation heads in combination with a matching backbone via mmcv, and also how to load and use the Mask2Former-based segmentation model trained on ADE20K</li>
+  <li><a href="docs/README_SEGMENTATION_LINEAR_PROBING.md">分割线性探测训练</a> - 在自定义分割数据上训练线性探测头及数据集格式说明</li>
 </ul>
 
 ## License

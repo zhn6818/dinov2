@@ -3,5 +3,5 @@ student:
   arch: vit_base
   patch_size: 14
 crops:
-  global_crops_size: 224  # 与 vitb14_finetune 训练配置一致
+  global_crops_size: 518  # 与 vitb14_finetune 训练配置一致
   local_crops_size: 98
