@@ -14,6 +14,10 @@ import matplotlib.pyplot as plt
 
 # 配置
 REPO_DIR = "/data1/code/dinov2"
+# 如果使用官方 ImageNet 预训练权重，保持如下路径；
+# 如果使用你在金相数据集上从头训练得到的权重，
+# 将该路径改为对应的 teacher_checkpoint.pth，例如：
+# WEIGHTS_PATH = "/data1/zhn/jinxiang_runs/run1/eval/training_24999/teacher_checkpoint.pth"
 WEIGHTS_PATH = "pretrain/dinov2_vitb14_pretrain.pth"
 IMAGE_DIR = "/data1/code/dinov2/output"  # 图片所在目录
 IMG_NAMES = ["test", "test2"]  # 不含扩展名，脚本会自动尝试 .jpg .png .jpeg

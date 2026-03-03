@@ -176,19 +176,30 @@ class MemEffAttention(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, x: Tensor, H, W) -> Tensor:
-        from xformers.ops import memory_efficient_attention, unbind
-
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads)
 
-        q, k, v = unbind(qkv, 2)
+        # 尝试使用 xFormers 的高效注意力，如果不可用则回退到普通注意力实现
+        try:
+            from xformers.ops import memory_efficient_attention, unbind  # type: ignore
 
-        x = memory_efficient_attention(q, k, v)
-        x = x.reshape([B, N, C])
+            q, k, v = unbind(qkv, 2)
+            out = memory_efficient_attention(q, k, v)
+            out = out.reshape([B, N, C])
+        except Exception:
+            # 回退路径：复制上面的标准 Attention 逻辑
+            qkv_std = qkv.permute(2, 0, 3, 1, 4)
+            q, k, v = qkv_std.unbind(0)  # [3, B, num_heads, N, C_head]
 
-        x = self.proj(x)
-        x = self.proj_drop(x)
-        return x
+            attn = (q @ k.transpose(-2, -1)) * self.scale
+            attn = attn.softmax(dim=-1)
+            attn = self.attn_drop(attn)
+
+            out = (attn @ v).transpose(1, 2).reshape(B, N, C)
+
+        out = self.proj(out)
+        out = self.proj_drop(out)
+        return out
 
 
 def window_partition(x, window_size):

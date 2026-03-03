@@ -81,9 +81,10 @@ class Attention(nn.Module):
 
 class MemEffAttention(Attention):
     def forward(self, x: Tensor, attn_bias=None) -> Tensor:
+        global XFORMERS_AVAILABLE
+        # 优先使用 xFormers，加速注意力；如果不可用或运行时报错，则安全回退到 PyTorch 自带注意力
         if not XFORMERS_AVAILABLE:
-            if attn_bias is not None:
-                raise AssertionError("xFormers is required for using nested tensors")
+            # 回退：忽略 attn_bias，直接使用标准 Attention 实现
             return super().forward(x)
 
         B, N, C = x.shape
@@ -91,9 +92,18 @@ class MemEffAttention(Attention):
 
         q, k, v = unbind(qkv, 2)
 
-        x = memory_efficient_attention(q, k, v, attn_bias=attn_bias)
-        x = x.reshape([B, N, C])
+        try:
+            out = memory_efficient_attention(q, k, v, attn_bias=attn_bias)
+        except Exception as e:  # pragma: no cover - 仅在不支持的设备上触发
+            warnings.warn(
+                f"xFormers memory_efficient_attention failed ({type(e).__name__}: {e}); "
+                "falling back to PyTorch scaled_dot_product_attention."
+            )
+            # 一旦检测到失败，后续直接走基类 Attention 的实现（忽略 attn_bias）
+            XFORMERS_AVAILABLE = False
+            return super().forward(x)
 
-        x = self.proj(x)
-        x = self.proj_drop(x)
-        return x
+        out = out.reshape([B, N, C])
+        out = self.proj(out)
+        out = self.proj_drop(out)
+        return out

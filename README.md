@@ -646,6 +646,26 @@ python dinov2/run/eval/linear.py \
     --val-dataset ImageNet:split=VAL:root=<PATH/TO/DATASET>:extra=<PATH/TO/DATASET>
 ```
 
+### Example: self-supervised pretraining on metallographic images
+
+For a small-scale, single-GPU self-supervised run on a custom metallographic image dataset organized as:
+
+- `/data1/zhn/jinxiang/<any_subfolder>/<image>.jpg`
+
+you can use the provided `JinXiang` dataset wrapper and a ViT-B/14 configuration:
+
+```shell
+PYTHONPATH=. python dinov2/run/train/train.py \
+    --nodes 1 \
+    --config-file dinov2/configs/train/jinxiang_vitb14.yaml \
+    --output-dir /data1/zhn/jinxiang_runs/run1
+```
+
+In this setup:
+
+- `train.dataset_path` inside `jinxiang_vitb14.yaml` is set to `JinXiang:root=/data1/zhn/jinxiang`, which scans all images under that root (recursively) without using labels.
+- Checkpoints of the teacher network are periodically written under `/data1/zhn/jinxiang_runs/run1/eval/` and can be reused later for feature extraction and visualization.
+
 ## Notebooks
 
 A few notebooks are provided to help the community leverage the models and code:

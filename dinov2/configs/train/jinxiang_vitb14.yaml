@@ -1,0 +1,27 @@
+dino:
+  head_n_prototypes: 65536
+  head_bottleneck_dim: 256
+ibot:
+  separate_head: false
+  head_n_prototypes: 65536
+train:
+  batch_size_per_gpu: 2
+  dataset_path: JinXiang:root=/data1/zhn/jinxiang
+  centering: centering
+student:
+  arch: vit_base
+  patch_size: 14
+  drop_path_rate: 0.2
+  ffn_layer: mlp
+  block_chunks: 4
+teacher:
+  momentum_teacher: 0.994
+optim:
+  epochs: 100
+  weight_decay_end: 0.4
+  base_lr: 2.0e-04  # learning rate for a batch size of 1024
+  warmup_epochs: 20
+  layerwise_decay: 0.9
+crops:
+  local_crops_size: 98
+

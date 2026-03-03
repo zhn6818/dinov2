@@ -346,12 +346,29 @@ class SSLMetaArch(nn.Module):
         return loss_dict
 
     def fsdp_synchronize_streams(self):
-        if self.need_to_synchronize_fsdp_streams:
-            torch.cuda.synchronize()
-            self.student.dino_head._streams = (
-                self.teacher.dino_head._streams
-            ) = self.student.backbone._streams = self.teacher.backbone._streams
+        """
+        在官方多机多卡 + xFormers FSDP 设置下，需要同步 FSDP 内部的流对象(_streams)。
+        在当前环境中，backbone / head 上可能不存在 _streams 属性（或未使用 xFormers FSDP），
+        这时安全地跳过该同步逻辑即可，不影响单机训练正确性，只是少了一点性能优化。
+        """
+        if not self.need_to_synchronize_fsdp_streams:
+            return
+
+        # 如果任一子模块没有 _streams 属性，则直接跳过同步（适配不完全 FSDP/xFormers 的环境）
+        if not (
+            hasattr(self.student.backbone, "_streams")
+            and hasattr(self.teacher.backbone, "_streams")
+            and hasattr(self.student.dino_head, "_streams")
+            and hasattr(self.teacher.dino_head, "_streams")
+        ):
             self.need_to_synchronize_fsdp_streams = False
+            return
+
+        torch.cuda.synchronize()
+        self.student.dino_head._streams = (
+            self.teacher.dino_head._streams
+        ) = self.student.backbone._streams = self.teacher.backbone._streams
+        self.need_to_synchronize_fsdp_streams = False
 
     def update_teacher(self, m):
         student_param_list = []
