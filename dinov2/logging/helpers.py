@@ -28,6 +28,13 @@ class MetricLogger(object):
             if isinstance(v, torch.Tensor):
                 v = v.item()
             assert isinstance(v, (float, int))
+            # 训练时 lr 往往很小，默认 4 位小数会显示为 0.0000，改用更高精度/科学计数法
+            if k in {"lr", "last_layer_lr", "min_lr"}:
+                if k not in self.meters:
+                    self.meters[k] = SmoothedValue(fmt="{median:.6e} ({global_avg:.6e})")
+            elif k in {"wd", "weight_decay"}:
+                if k not in self.meters:
+                    self.meters[k] = SmoothedValue(fmt="{median:.6f} ({global_avg:.6f})")
             self.meters[k].update(v)
 
     def __getattr__(self, attr):

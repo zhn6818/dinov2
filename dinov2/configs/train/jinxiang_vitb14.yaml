@@ -5,7 +5,7 @@ ibot:
   separate_head: false
   head_n_prototypes: 65536
 train:
-  batch_size_per_gpu: 2
+  batch_size_per_gpu: 2  # 保守提升（原4）
   dataset_path: JinXiang:root=/data1/zhn/jinxiang
   centering: centering
 student:
@@ -15,13 +15,12 @@ student:
   ffn_layer: mlp
   block_chunks: 4
 teacher:
-  momentum_teacher: 0.994
+  momentum_teacher: 0.995  # 微调（原0.994）
 optim:
   epochs: 100
   weight_decay_end: 0.4
-  base_lr: 2.0e-04  # learning rate for a batch size of 1024
-  warmup_epochs: 20
+  base_lr: 3.0e-03  # 保守提升（原2.0e-04）
+  warmup_epochs: 0  # 缩短（原10）
   layerwise_decay: 0.9
 crops:
   local_crops_size: 98
-

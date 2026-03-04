@@ -11,6 +11,7 @@ from torchvision import transforms
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 # 配置
 REPO_DIR = "/data1/code/dinov2"
@@ -18,9 +19,10 @@ REPO_DIR = "/data1/code/dinov2"
 # 如果使用你在金相数据集上从头训练得到的权重，
 # 将该路径改为对应的 teacher_checkpoint.pth，例如：
 # WEIGHTS_PATH = "/data1/zhn/jinxiang_runs/run1/eval/training_24999/teacher_checkpoint.pth"
+# WEIGHTS_PATH = "output/jinxiang/eval/training_87499/teacher_checkpoint.pth"
 WEIGHTS_PATH = "pretrain/dinov2_vitb14_pretrain.pth"
 IMAGE_DIR = "/data1/code/dinov2/output"  # 图片所在目录
-IMG_NAMES = ["test", "test2"]  # 不含扩展名，脚本会自动尝试 .jpg .png .jpeg
+IMG_NAMES = ["test", "test2", "test3", "test4", "test5"]  # 不含扩展名，脚本会自动尝试 .jpg .png .jpeg
 VIS_OUTPUT_DIR = "/data1/code/dinov2/output/vis"  # 可视化结果保存目录
 
 # DINOv2 使用的图像尺寸
@@ -130,10 +132,65 @@ def visualize_cls_patch_similarity(model, x, img_path, output_dir, name):
 
 
 def load_weights(model, weights_path):
-    """加载权重，支持官方格式和自训练格式（含 teacher 字段）"""
-    import dinov2.utils.utils as dinov2_utils
-    dinov2_utils.load_pretrained_weights(model, weights_path, checkpoint_key="teacher")
+    """
+    从 224 输入训练得到的 checkpoint 加载到 518 输入的 DINOv2 ViT-B/14：
+    - 其它权重直接加载
+    - 把 16×16 的 pos_embed 双线性插值成 37×37，再塞进模型
+    """
+    ckpt = torch.load(weights_path, map_location="cpu")
 
+    # 1. 取出真正的 state_dict（兼容 teacher_checkpoint 的格式）
+    if isinstance(ckpt, dict) and "teacher" in ckpt:
+        state_dict = ckpt["teacher"]
+    else:
+        state_dict = ckpt
+
+    # 2. 去掉 "module." / "backbone." 前缀
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        k = k.replace("module.", "").replace("backbone.", "")
+        new_state_dict[k] = v
+
+    # 3. 处理 pos_embed：从 16×16 插值到 37×37
+    if "pos_embed" in new_state_dict and hasattr(model, "pos_embed"):
+        pos_embed_ckpt = new_state_dict["pos_embed"]          # [1, 257, C]
+        pos_embed_model = model.pos_embed                     # [1, 1370, C]
+
+        if pos_embed_ckpt.shape != pos_embed_model.shape:
+            print(
+                f"检测到 pos_embed 形状不一致，执行插值："
+                f"ckpt {pos_embed_ckpt.shape} -> model {pos_embed_model.shape}"
+            )
+            # 拆分 CLS token 和 patch token
+            cls_pos_ckpt = pos_embed_ckpt[:, :1, :]           # [1, 1, C]
+            patch_pos_ckpt = pos_embed_ckpt[:, 1:, :]         # [1, 256, C]
+
+            # 计算 ckpt 和 model 的 patch 网格尺寸
+            num_patches_ckpt = patch_pos_ckpt.shape[1]
+            num_patches_model = pos_embed_model.shape[1] - 1  # 去掉 CLS
+
+            H_ckpt = W_ckpt = int(num_patches_ckpt ** 0.5)    # 16
+            H_model = W_model = int(num_patches_model ** 0.5) # 37
+
+            patch_pos_ckpt = patch_pos_ckpt.reshape(1, H_ckpt, W_ckpt, -1).permute(0, 3, 1, 2)  # [1, C, 16, 16]
+
+            # 双线性插值到 37×37
+            patch_pos_resized = F.interpolate(
+                patch_pos_ckpt,
+                size=(H_model, W_model),
+                mode="bicubic",
+                align_corners=False,
+            )  # [1, C, 37, 37]
+
+            patch_pos_resized = patch_pos_resized.permute(0, 2, 3, 1).reshape(1, H_model * W_model, -1)  # [1, 1369, C]
+
+            # 拼回 CLS + patch
+            new_pos_embed = torch.cat([cls_pos_ckpt, patch_pos_resized], dim=1)  # [1, 1370, C]
+            new_state_dict["pos_embed"] = new_pos_embed
+
+    # 4. 加载权重（其余不匹配的自动忽略）
+    msg = model.load_state_dict(new_state_dict, strict=False)
+    print(f"load_state_dict 消息：{msg}")
 
 def main():
     # 1. 加载模型
