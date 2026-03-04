@@ -775,3 +775,9 @@ cell_dino_vitl14 = torch.hub.load(REPO_DIR, 'cell_dino_hpa_vitl14', source='loca
 
  Code is released under the CC BY NC License. See [LICENSE_CELL_DINO_CODE](LICENSE_CELL_DINO_CODE) for additional details.
  Model weights are released under the FAIR Noncommercial Research License. See [LICENSE_CELL_DINO_CODE_WEIGHTS](LICENSE_CELL_DINO_CODE_WEIGHTS) for additional details.
+
+ ## train script
+
+ -  PYTHONPATH=. python dinov2/train/train.py \
+         --config-file dinov2/configs/train/jinxiang_vitb14.yaml \
+         --output-dir output/jinxiang518/
