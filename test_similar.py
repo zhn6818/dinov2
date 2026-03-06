@@ -13,17 +13,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
+import random
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+set_seed(42)
+
 # 配置
 REPO_DIR = "/data1/code/dinov2"
 # 如果使用官方 ImageNet 预训练权重，保持如下路径；
 # 如果使用你在金相数据集上从头训练得到的权重，
 # 将该路径改为对应的 teacher_checkpoint.pth，例如：
 # WEIGHTS_PATH = "/data1/zhn/jinxiang_runs/run1/eval/training_24999/teacher_checkpoint.pth"
-# WEIGHTS_PATH = "output/jinxiang/eval/training_87499/teacher_checkpoint.pth"
-WEIGHTS_PATH = "pretrain/dinov2_vitb14_pretrain.pth"
+WEIGHTS_PATH = "output/jinxiang/eval/training_87499/teacher_checkpoint.pth"
+# WEIGHTS_PATH = "pretrain/dinov2_vitb14_pretrain.pth"
 IMAGE_DIR = "/data1/code/dinov2/output"  # 图片所在目录
-IMG_NAMES = ["test", "test2", "test3", "test4", "test5"]  # 不含扩展名，脚本会自动尝试 .jpg .png .jpeg
-VIS_OUTPUT_DIR = "/data1/code/dinov2/output/vis"  # 可视化结果保存目录
+IMG_NAMES = ["test4"]  # 不含扩展名，脚本会自动尝试 .jpg .png .jpeg
+VIS_OUTPUT_DIR = "/data1/code/dinov2/output/vis_result"  # 可视化结果保存目录
 
 # DINOv2 使用的图像尺寸
 IMG_SIZE = 518
@@ -53,11 +62,15 @@ def visualize_patch_pca(model, x, img_path, output_dir, name):
         features = model.get_intermediate_layers(x, n=1, reshape=True, return_class_token=False)
     # features[0]: [1, 768, H, W]
     patch_tokens = features[0]
-    B, C, H, W = patch_tokens.shape
+    _, C, H, W = patch_tokens.shape
     patch_flat = patch_tokens[0].permute(1, 2, 0).reshape(-1, C).numpy()
 
     pca = PCA(n_components=3)
     rgb = pca.fit_transform(patch_flat)
+    # 消除 PCA 主成分的符号不确定性：使每列均值非负
+    for j in range(3):
+        if rgb[:, j].mean() < 0:
+            rgb[:, j] = -rgb[:, j]
     rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min() + 1e-8)
     rgb = np.clip(rgb, 0, 1).reshape(H, W, 3)
 
