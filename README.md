@@ -780,4 +780,19 @@ cell_dino_vitl14 = torch.hub.load(REPO_DIR, 'cell_dino_hpa_vitl14', source='loca
 
  -  PYTHONPATH=. python dinov2/train/train.py \
          --config-file dinov2/configs/train/jinxiang_vitb14.yaml \
-         --output-dir output/jinxiang518/
+         --output-dir output/jinxiang_vit8/
+
+ ## Attention 分析脚本
+
+ 分析 DINOv2 各层 Attention Map，计算平均 attention distance，判断局部/全局特征倾向。
+
+ ```bash
+ # 使用 Shell 脚本（推荐）
+ ./scripts/run_analyze_attention.sh /path/to/image.jpg
+
+ # 指定权重和输出路径
+ ./scripts/run_analyze_attention.sh image.png --weights output/xxx/teacher_checkpoint.pth --output result.png
+
+ # 或直接调用 Python
+ python scripts/analyze_attention.py --image /path/to/image.jpg [--weights ...] [--arch vit_base] [--output ...]
+ ```
