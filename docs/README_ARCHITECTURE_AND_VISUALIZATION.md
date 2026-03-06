@@ -1,6 +1,6 @@
 # DINOv2 架构与特征可视化说明
 
-本文档总结 DINOv2 Vision Transformer 中的关键概念，包括 **Patch 特征 PCA 可视化** 和 **Register Tokens**。
+本文档总结 DINOv2 Vision Transformer 中的关键概念，包括 **Patch 特征 PCA 可视化**、**Register Tokens**，以及 `test_similar.py` 中的 **特征通道均值热力图** 和 **CLS-Patch 相似度图**。
 
 ---
 
@@ -97,17 +97,51 @@ nn.init.normal_(self.register_tokens, std=1e-6)
 
 ---
 
-## 三、相关代码位置
+## 三、其他可视化函数（test_similar.py）
+
+### 3.1 特征通道均值热力图 `visualize_feature_heatmap`
+
+**功能**：将每个 patch 位置的 768 维特征在通道维度上取均值，得到一张 37×37 的热力图，用于展示 **各空间位置的整体特征激活强度**。
+
+| 项目 | 说明 |
+|------|------|
+| **数据来源** | 最后一层 patch tokens（与 PCA 相同） |
+| **计算方式** | `patch_tokens[0].mean(dim=0)` → 对 768 通道取均值 |
+| **输出形状** | [H, W] = [37, 37] |
+| **颜色映射** | viridis（紫→绿→黄，数值越大越亮） |
+| **直观含义** | 越亮表示该 patch 的 768 维特征整体激活越强 |
+
+适用于快速查看模型在哪些区域有较强的特征响应。
+
+### 3.2 CLS-Patch 相似度图 `visualize_cls_patch_similarity`
+
+**功能**：计算 **CLS token** 与每个 **patch token** 的余弦相似度，并 reshape 成空间热力图，用于展示 **CLS 更关注图像的哪些区域**（注意力式可视化）。
+
+| 项目 | 说明 |
+|------|------|
+| **数据来源** | `model.forward_features(x)` 的 `x_norm_clstoken` 与 `x_norm_patchtokens` |
+| **计算方式** | 余弦相似度：`(patch_norm * cls_norm).sum(dim=-1)` |
+| **输出形状** | [H, W] = [37, 37] |
+| **颜色映射** | hot（黑→红→黄→白，越亮越相关） |
+| **直观含义** | 越亮表示该 patch 与 CLS 越相似，即 CLS 对该区域更“关注” |
+
+与 PCA、热力图不同，该可视化反映的是 **全局表征（CLS）与局部 patch 的关联程度**，常用于理解模型认为图像中哪些区域对整体语义更重要。
+
+---
+
+## 四、相关代码位置
 
 | 功能 | 文件 | 说明 |
 |------|------|------|
 | `get_intermediate_layers` | `dinov2/models/vision_transformer.py` | 提取中间层特征 |
 | Patch PCA 可视化 | `test_similar.py` | `visualize_patch_pca()` |
+| 特征通道均值热力图 | `test_similar.py` | `visualize_feature_heatmap()` |
+| CLS-Patch 相似度图 | `test_similar.py` | `visualize_cls_patch_similarity()` |
 | Register tokens 定义 | `dinov2/models/vision_transformer.py` | `prepare_tokens_with_masks()` |
 
 ---
 
-## 四、参考
+## 五、参考
 
 - [DINOv2: Learning Robust Visual Features without Supervision](https://arxiv.org/abs/2304.07193)
 - [Vision Transformers Need Registers](https://arxiv.org/abs/2309.16588)
