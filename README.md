@@ -795,4 +795,7 @@ cell_dino_vitl14 = torch.hub.load(REPO_DIR, 'cell_dino_hpa_vitl14', source='loca
 
  # 或直接调用 Python
  python scripts/analyze_attention.py --image /path/to/image.jpg [--weights ...] [--arch vit_base] [--output ...]
+
+python scripts/analyze_attention.py     --image output/test3.jpg     --weights output/jinxiang/eval/training_87499/teacher_checkpoint.pth     --detailed     --per-head     --csv output/full_analysis.csv     --output output/full_analysis.png
+
  ```
