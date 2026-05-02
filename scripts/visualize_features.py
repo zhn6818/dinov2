@@ -11,6 +11,7 @@ os.environ["XFORMERS_DISABLED"] = "1"
 
 import argparse
 import colorsys
+import re
 import random
 from pathlib import Path
 
@@ -44,6 +45,16 @@ def load_model(weights_path: str):
     ckpt = torch.load(weights_path, map_location="cpu")
     state_dict = ckpt.get("teacher", ckpt)
     cleaned = {k.replace("module.", "").replace("backbone.", ""): v for k, v in state_dict.items()}
+
+    # 处理 BlockChunk 格式: blocks.{chunk}.{block_idx}.* -> blocks.{block_idx}.*
+    mapped = {}
+    for k, v in cleaned.items():
+        m = re.match(r"blocks\.\d+\.(\d+)(\..*)", k)
+        if m:
+            mapped[f"blocks.{m.group(1)}{m.group(2)}"] = v
+        elif not k.startswith("dino_head."):
+            mapped[k] = v
+    cleaned = mapped
 
     if "pos_embed" in cleaned and hasattr(model, "pos_embed"):
         ckpt_pe = cleaned["pos_embed"]
