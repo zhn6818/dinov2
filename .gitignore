@@ -16,3 +16,4 @@ output/
 *.txt
 *.log
 *.out
+.claude/
