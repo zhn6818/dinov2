@@ -8,11 +8,7 @@ DINOv2 是 Meta AI 的自监督视觉 Transformer 框架。本 fork 扩展了自
 
 ## 构建与运行命令
 
-**环境配置：**
-```shell
-conda env create -f conda.yaml && conda activate dinov2
-# 或：pip install -r requirements.txt
-```
+**运行环境：** 所有 Python 脚本在 Docker 容器 `JHCVTrain` 的 `ai` 虚拟环境中运行，不要在本地安装新环境。
 
 **训练（需设置 `PYTHONPATH=.`）：**
 ```shell
